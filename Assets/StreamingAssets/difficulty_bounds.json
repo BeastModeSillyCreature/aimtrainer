@@ -1,0 +1,7 @@
+{
+  "modes": [
+    { "mode": "Soft",       "minScale": 0.7, "maxScale": 1.5, "minSpeed": 1.0, "maxSpeed": 5.0,  "minLifetime": 1.5, "maxLifetime": 4.0 },
+    { "mode": "Aggressive", "minScale": 0.3, "maxScale": 1.5, "minSpeed": 1.0, "maxSpeed": 10.0, "minLifetime": 0.6, "maxLifetime": 4.0 },
+    { "mode": "Fixed",      "minScale": 0.5, "maxScale": 1.5, "minSpeed": 1.0, "maxSpeed": 8.0,  "minLifetime": 0.8, "maxLifetime": 4.0 }
+  ]
+}
