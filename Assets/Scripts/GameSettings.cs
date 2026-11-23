@@ -25,7 +25,8 @@ public static class GameSettings
         }
         set
         {
-            _sensitivity = Mathf.Clamp(value, MinSensitivity, MaxSensitivity);
+            // Округляем до 4 знаков: шаг настройки 0.0001
+            _sensitivity = Mathf.Clamp(Mathf.Round(value * 10000f) / 10000f, MinSensitivity, MaxSensitivity);
             PlayerPrefs.SetFloat(SensitivityKey, _sensitivity);
         }
     }

@@ -42,20 +42,36 @@ public class SettingsMenu : MonoBehaviour
 
     private void SyncFromSettings()
     {
-        _sensSlider.SetValueWithoutNotify(Mathf.Round(GameSettings.Sensitivity * 1000f));
+        _sensSlider.SetValueWithoutNotify(Mathf.Round(GameSettings.Sensitivity * 10000f));
         _dpiSlider.SetValueWithoutNotify(GameSettings.Dpi / 100f);
         UpdateLabels();
     }
 
     private void UpdateLabels()
     {
-        _sensLabel.text = $"Sensitivity: {GameSettings.Sensitivity:F3} deg/count";
+        _sensLabel.text = $"Sensitivity: {GameSettings.Sensitivity:F4} deg/count";
         _dpiLabel.text = $"Mouse DPI: {GameSettings.Dpi}   =   {GameSettings.CmPer360:F1} cm/360";
     }
 
     private void OnSensChanged(float value)
     {
-        GameSettings.Sensitivity = value / 1000f;
+        GameSettings.Sensitivity = value / 10000f;
+        UpdateLabels();
+    }
+
+    // Шаг чувствительности ровно 0.0001 (при удержании кнопки умножается на множитель)
+    private void NudgeSensitivity(int steps)
+    {
+        float current = Mathf.Round(GameSettings.Sensitivity * 10000f);
+        GameSettings.Sensitivity = (current + steps) / 10000f;
+        _sensSlider.SetValueWithoutNotify(Mathf.Round(GameSettings.Sensitivity * 10000f));
+        UpdateLabels();
+    }
+
+    private void NudgeDpi(int direction)
+    {
+        GameSettings.Dpi = Mathf.Clamp(GameSettings.Dpi + direction * 100, 400, 3200);
+        _dpiSlider.SetValueWithoutNotify(GameSettings.Dpi / 100f);
         UpdateLabels();
     }
 
@@ -114,10 +130,19 @@ public class SettingsMenu : MonoBehaviour
         CreateLabel(p, "Title", "SETTINGS", 46, new Vector2(0f, 255f), new Vector2(700f, 70f));
 
         _sensLabel = CreateLabel(p, "SensLabel", "", 32, new Vector2(0f, 150f), new Vector2(700f, 50f));
-        _sensSlider = CreateSlider(p, new Vector2(0f, 100f), 10f, 500f, OnSensChanged);
+        _sensSlider = CreateSlider(p, new Vector2(0f, 100f), 100f, 5000f, OnSensChanged);
 
         _dpiLabel = CreateLabel(p, "DpiLabel", "", 32, new Vector2(0f, 10f), new Vector2(700f, 50f));
         _dpiSlider = CreateSlider(p, new Vector2(0f, -40f), 4f, 32f, OnDpiChanged);
+
+        // Кнопки точной настройки: шаг 0.001 для чувствительности и 100 для DPI, при удержании повторяются
+        CreateRepeatButton(p, "-", new Vector2(-345f, 100f), new Vector2(60f, 44f), m => NudgeSensitivity(-m));
+        CreateRepeatButton(p, "+", new Vector2(345f, 100f), new Vector2(60f, 44f), m => NudgeSensitivity(m));
+        CreateRepeatButton(p, "-", new Vector2(-345f, -40f), new Vector2(60f, 44f), m => NudgeDpi(-1));
+        CreateRepeatButton(p, "+", new Vector2(345f, -40f), new Vector2(60f, 44f), m => NudgeDpi(1));
+
+        Text hint = CreateLabel(p, "Hint", "Hold - / + to change fast (step 0.0001)", 22, new Vector2(0f, -92f), new Vector2(700f, 30f));
+        hint.color = new Color(0.6f, 0.6f, 0.65f);
 
         CreateButton(p, "Resume", new Vector2(0f, -150f), new Vector2(380f, 70f), look.Resume);
         CreateButton(p, "Quit", new Vector2(0f, -240f), new Vector2(380f, 64f), Quit);
@@ -147,6 +172,17 @@ public class SettingsMenu : MonoBehaviour
         label.text = text;
         label.raycastTarget = false; // чтобы клики проходили к кнопкам под текстом
         return label;
+    }
+
+    private void CreateRepeatButton(Transform parent, string label, Vector2 position, Vector2 size, System.Action<int> onStep)
+    {
+        GameObject go = CreateRect(parent, label + "RepeatButton", position, size);
+        go.AddComponent<Image>().color = new Color(0.2f, 0.45f, 0.9f, 1f);
+
+        RepeatButton repeat = go.AddComponent<RepeatButton>();
+        repeat.OnStep = onStep;
+
+        CreateLabel(go.transform, "Text", label, 34, Vector2.zero, size);
     }
 
     private void CreateButton(Transform parent, string label, Vector2 position, Vector2 size,
@@ -218,5 +254,45 @@ public class SettingsMenu : MonoBehaviour
         slider.wholeNumbers = true;
         slider.onValueChanged.AddListener(onChanged);
         return slider;
+    }
+}
+
+// Кнопка с автоповтором: клик = один шаг, удержание = повтор с ускорением
+// (через 1.5 с шаг x10, через 3.5 с шаг x100). Время считается по unscaledTime,
+// так как в меню игра стоит на паузе (timeScale = 0).
+public class RepeatButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerExitHandler
+{
+    public System.Action<int> OnStep; // параметр: множитель шага (1, 10 или 100)
+
+    private bool _held;
+    private float _heldSince;
+    private float _nextStepTime;
+
+    public void OnPointerDown(PointerEventData eventData)
+    {
+        _held = true;
+        _heldSince = Time.unscaledTime;
+        OnStep?.Invoke(1);
+        _nextStepTime = Time.unscaledTime + 0.4f; // задержка перед началом повтора
+    }
+
+    public void OnPointerUp(PointerEventData eventData)
+    {
+        _held = false;
+    }
+
+    public void OnPointerExit(PointerEventData eventData)
+    {
+        _held = false;
+    }
+
+    private void Update()
+    {
+        if (!_held || Time.unscaledTime < _nextStepTime) return;
+
+        float heldFor = Time.unscaledTime - _heldSince;
+        int multiplier = heldFor > 3.5f ? 100 : (heldFor > 1.5f ? 10 : 1);
+        OnStep?.Invoke(multiplier);
+        _nextStepTime = Time.unscaledTime + 0.05f;
     }
 }

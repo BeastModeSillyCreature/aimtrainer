@@ -41,13 +41,13 @@ public class ResultsPanel : MonoBehaviour
     private void Start()
     {
         recorder.SessionSaved += Show;
-        round.RoundStarted += Hide;
+        round.CountdownStarted += Hide;
     }
 
     private void OnDestroy()
     {
         if (recorder != null) recorder.SessionSaved -= Show;
-        if (round != null) round.RoundStarted -= Hide;
+        if (round != null) round.CountdownStarted -= Hide;
     }
 
     private void Hide()
@@ -157,7 +157,8 @@ public class ResultsPanel : MonoBehaviour
         CreateLabel(p, "AccCaption", "Accuracy per window", 22, TextAnchor.MiddleCenter, new Vector2(250f, 52f), new Vector2(560f, 40f));
         _accEmpty = CreateChart(p, "AccChart", new Vector2(250f, -45f), _accBars);
 
-        CreateLabel(p, "Footer", "Click to play again", 34, TextAnchor.MiddleCenter, new Vector2(0f, -325f), new Vector2(800f, 50f));
+        CreateLabel(p, "Footer", "Click or R - play again", 34,
+            TextAnchor.MiddleCenter, new Vector2(0f, -325f), new Vector2(800f, 50f));
 
         _panel.SetActive(false);
     }

@@ -61,6 +61,7 @@ public class SessionRecorder : MonoBehaviour
     {
         round.RoundStarted += OnRoundStarted;
         round.RoundFinished += OnRoundFinished;
+        round.RoundAborted += OnRoundAborted;
         if (dda != null) dda.WindowProcessed += OnWindow;
     }
 
@@ -72,6 +73,7 @@ public class SessionRecorder : MonoBehaviour
         {
             round.RoundStarted -= OnRoundStarted;
             round.RoundFinished -= OnRoundFinished;
+            round.RoundAborted -= OnRoundAborted;
         }
         if (dda != null) dda.WindowProcessed -= OnWindow;
     }
@@ -84,6 +86,12 @@ public class SessionRecorder : MonoBehaviour
             startedAtUtc = DateTime.UtcNow.ToString("o")
         };
         _startTime = Time.time; // на паузе Time.time стоит, поэтому пауза не входит в длительность
+    }
+
+    // Раунд прерван клавишей R: прерванная попытка не сохраняется
+    private void OnRoundAborted()
+    {
+        _current = null;
     }
 
     private void OnWindow(PlayerMetrics metrics, DDAState state, TargetConfiguration config)

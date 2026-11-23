@@ -25,6 +25,7 @@ public class RoundHud : MonoBehaviour
 
     private void Start()
     {
+        round.CountdownStarted += Refresh;
         round.RoundStarted += Refresh;
         round.RoundFinished += Refresh;
         round.StatsChanged += Refresh;
@@ -36,6 +37,7 @@ public class RoundHud : MonoBehaviour
     private void OnDestroy()
     {
         if (round == null) return;
+        round.CountdownStarted -= Refresh;
         round.RoundStarted -= Refresh;
         round.RoundFinished -= Refresh;
         round.StatsChanged -= Refresh;
@@ -45,6 +47,17 @@ public class RoundHud : MonoBehaviour
 
     private void Update()
     {
+        if (round.State == RoundState.Countdown)
+        {
+            int countdown = Mathf.CeilToInt(round.CountdownLeft);
+            if (countdown != _lastSecond)
+            {
+                _lastSecond = countdown;
+                Refresh();
+            }
+            return;
+        }
+
         if (round.State != RoundState.Running) return;
 
         int second = Mathf.CeilToInt(round.TimeLeft);
@@ -68,6 +81,11 @@ public class RoundHud : MonoBehaviour
                 _center.text = "Click to start" + (dda != null ? $"\n\nMode: {dda.Mode}  (keys 1 / 2 / 3)" : "") + "\nEsc - settings";
                 break;
 
+            case RoundState.Countdown:
+                _stats.text = "";
+                _center.text = $"Get ready\n<size=140>{Mathf.CeilToInt(round.CountdownLeft)}</size>\n\nR - restart";
+                break;
+
             case RoundState.Running:
                 _stats.text =
                     $"Time: {Mathf.CeilToInt(round.TimeLeft)}\n" +
@@ -75,7 +93,8 @@ public class RoundHud : MonoBehaviour
                     $"Accuracy: {s.Accuracy:F0}%\n" +
                     $"Time to hit: {s.AvgTimeToHitMs:F0} ms\n" +
                     $"Reaction: {s.AvgReactionMs:F0} ms" +
-                    (dda != null ? $"\nDifficulty: {dda.State}\nMode: {dda.Mode}" : "");
+                    (dda != null ? $"\nDifficulty: {dda.State}\nMode: {dda.Mode}" : "") +
+                    "\nR - restart";
                 _center.text = "";
                 break;
 
