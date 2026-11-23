@@ -10,6 +10,7 @@ public class SessionRecorder : MonoBehaviour
     [SerializeField] private RoundController round;
     [SerializeField] private DDARunner dda;
     [SerializeField] private string fileName = "profile.json";
+    [SerializeField] private string databaseFileName = "profile.db";
 
     public event Action<SessionRecord> SessionSaved;
 
@@ -25,11 +26,35 @@ public class SessionRecorder : MonoBehaviour
         if (round == null) round = FindFirstObjectByType<RoundController>();
         if (dda == null) dda = FindFirstObjectByType<DDARunner>();
 
-        string path = Path.Combine(Application.persistentDataPath, fileName);
-        Repository = new JsonProfileRepository(path); // <- здесь позже будет SqliteProfileRepository
+        string jsonPath = Path.Combine(Application.persistentDataPath, fileName);
+        string storage = jsonPath;
+        IProfileRepository repository = null;
+
+#if USE_SQLITE
+        try
+        {
+            string dbPath = Path.Combine(Application.persistentDataPath, databaseFileName);
+            SqliteProfileRepository sqlite = new SqliteProfileRepository(dbPath);
+
+            // Первый запуск с SQLite: переносим раунды из старого profile.json (сам файл остаётся)
+            int imported = sqlite.ImportIfEmpty(new JsonProfileRepository(jsonPath).Load());
+            if (imported > 0) Debug.Log($"[Profile] imported {imported} rounds from JSON into SQLite");
+
+            repository = sqlite;
+            storage = dbPath;
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[Profile] SQLite is unavailable ({e.Message}). Falling back to JSON.");
+        }
+#endif
+
+        if (repository == null) repository = new JsonProfileRepository(jsonPath);
+
+        Repository = repository;
         Profile = Repository.Load();
 
-        Debug.Log($"[Profile] file: {path}, saved rounds: {Profile.sessions.Count}");
+        Debug.Log($"[Profile] storage: {storage}, saved rounds: {Profile.sessions.Count}");
     }
 
     private void Start()
@@ -41,6 +66,8 @@ public class SessionRecorder : MonoBehaviour
 
     private void OnDestroy()
     {
+        (Repository as IDisposable)?.Dispose(); // закрыть файл БД
+
         if (round != null)
         {
             round.RoundStarted -= OnRoundStarted;
