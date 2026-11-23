@@ -801,7 +801,7 @@ PlayerSettings:
   webEnableSubmoduleStrippingCompatibility: 0
   webProgressiveAssetLoading: 0
   scriptingDefineSymbols:
-    Standalone: USE_SQLITE
+    Standalone: USE_SQLITE;SENTIS_ANALYTICS_ENABLED;APP_UI_EDITOR_ONLY;USE_ONNX
   additionalCompilerArguments: {}
   platformArchitecture: {}
   scriptingBackend:

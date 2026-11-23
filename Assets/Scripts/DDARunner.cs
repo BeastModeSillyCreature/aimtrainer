@@ -2,6 +2,9 @@ using System;
 using System.IO;
 using UnityEngine;
 using UnityEngine.InputSystem;
+#if USE_ONNX
+using Unity.InferenceEngine;
+#endif
 
 // Точка сборки модуля DDA в Unity: создаёт все объекты, подписывается на метрики
 // и каждый кадр передаёт плавно меняющиеся параметры в спавнер.
@@ -11,6 +14,9 @@ public class DDARunner : MonoBehaviour
     [SerializeField] private DDAMode mode = DDAMode.Aggressive;
     [SerializeField] private float transitionSeconds = 1.5f;
     [SerializeField] private string boundsFileName = "difficulty_bounds.json";
+#if USE_ONNX
+    [SerializeField] private ModelAsset onnxModel; // сюда перетащить dda_model.onnx
+#endif
     [SerializeField] private TargetSpawner spawner;
     [SerializeField] private MetricsCollector metrics;
     [SerializeField] private RoundController round;
@@ -24,6 +30,7 @@ public class DDARunner : MonoBehaviour
     public DDAMode Mode => mode;
 
     private IAIController _controller;
+    private IPredictionService _prediction;
     private DifficultyBoundsValidator _validator;
     private IGameplayInteractor _interactor;
     private ConfigSmoother _smoother;
@@ -37,8 +44,9 @@ public class DDARunner : MonoBehaviour
         string path = Path.Combine(Application.streamingAssetsPath, boundsFileName);
         _validator = new DifficultyBoundsValidator(path) { Mode = mode };
 
+        _prediction = CreatePredictionService();
         _controller = new AimDDAController(
-            new HeuristicPredictionService(),
+            _prediction,
             new FsmDecisionStrategy(),
             new LinearFallbackDecisionStrategy(),
             _validator);
@@ -46,6 +54,32 @@ public class DDARunner : MonoBehaviour
         _interactor = new SpawnerInteractor(spawner);
         _smoother = new ConfigSmoother(_controller.GetCurrentConfiguration(), transitionSeconds);
         _interactor.ApplyConfiguration(_smoother.Current);
+    }
+
+    // Выбор сервиса предсказания: нейросеть ONNX, а если её нет или она не загрузилась, эвристика
+    private IPredictionService CreatePredictionService()
+    {
+#if USE_ONNX
+        if (onnxModel != null)
+        {
+            try
+            {
+                IPredictionService onnx = new OnnxPredictionService(onnxModel);
+                Debug.Log("[DDA] Prediction service: ONNX neural network");
+                return onnx;
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[DDA] Cannot load ONNX model ({e.Message}). Using heuristic instead.");
+            }
+        }
+        else
+        {
+            Debug.LogWarning("[DDA] ONNX model is not assigned in DDARunner. Using heuristic instead.");
+        }
+#endif
+        Debug.Log("[DDA] Prediction service: heuristic");
+        return new HeuristicPredictionService();
     }
 
     private void Start()
@@ -56,6 +90,7 @@ public class DDARunner : MonoBehaviour
 
     private void OnDestroy()
     {
+        (_prediction as IDisposable)?.Dispose(); // освободить ресурсы нейросети
         if (metrics != null) metrics.WindowCompleted -= OnWindow;
         if (round != null) round.RoundStarted -= OnRoundStarted;
     }

@@ -294,6 +294,7 @@ MonoBehaviour:
   mode: 0
   transitionSeconds: 1.5
   boundsFileName: difficulty_bounds.json
+  onnxModel: {fileID: 5022602860645237092, guid: 64d1b24d5f669d3498455edcbed805a0, type: 3}
   spawner: {fileID: 0}
   metrics: {fileID: 0}
   round: {fileID: 0}
@@ -358,6 +359,7 @@ MonoBehaviour:
   round: {fileID: 0}
   dda: {fileID: 0}
   fileName: profile.json
+  databaseFileName: profile.db
 --- !u!1 &330585543
 GameObject:
   m_ObjectHideFlags: 0

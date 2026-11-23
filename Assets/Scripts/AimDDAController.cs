@@ -16,6 +16,10 @@ public sealed class AimDDAController : IAIController
     public DDAState CurrentState { get; private set; } = DDAState.Medium;
     public bool LastUsedFallback { get; private set; }
 
+    // E-2.1: если предсказание длится дольше этого времени, используется резервная стратегия
+    public float MaxInferenceMs { get; set; } = 10f;
+    public float LastInferenceMs { get; private set; }
+
     public AimDDAController(
         IPredictionService prediction,
         IDecisionStrategy strategy,
@@ -47,7 +51,13 @@ public sealed class AimDDAController : IAIController
         DDAState predicted;
         try
         {
+            System.Diagnostics.Stopwatch timer = System.Diagnostics.Stopwatch.StartNew();
             float[] logits = _prediction.Predict(_features);
+            LastInferenceMs = (float)timer.Elapsed.TotalMilliseconds;
+
+            if (LastInferenceMs > MaxInferenceMs)
+                throw new TimeoutException($"inference took {LastInferenceMs:F1} ms (limit {MaxInferenceMs:F0} ms)");
+
             predicted = _strategy.EvaluateState(logits);
             LastUsedFallback = false;
         }
