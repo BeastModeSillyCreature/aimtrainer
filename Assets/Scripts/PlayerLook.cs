@@ -18,6 +18,10 @@ public class PlayerLook : MonoBehaviour
     public bool CanShoot { get; private set; }
     public bool InMenu { get; private set; }
 
+    // Текущее направление прицела (градусы, накопленные): вправо и вверх положительные
+    public float Yaw => _yaw;
+    public float PitchUp => -_pitch;
+
     public event Action MenuToggled;
 
     private void Start()

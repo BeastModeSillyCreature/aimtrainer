@@ -50,6 +50,7 @@ public class RoundController : MonoBehaviour
     private void Start()
     {
         shooting.ShotFired += OnShot;
+        shooting.ShotDetailed += OnShotDetailed;
         spawner.TargetExpired += OnExpired;
         reactionTracker.ReactionMeasured += OnReaction;
     }
@@ -57,7 +58,11 @@ public class RoundController : MonoBehaviour
     private void OnDestroy()
     {
         Time.timeScale = 1f;
-        if (shooting != null) shooting.ShotFired -= OnShot;
+        if (shooting != null)
+        {
+            shooting.ShotFired -= OnShot;
+            shooting.ShotDetailed -= OnShotDetailed;
+        }
         if (spawner != null) spawner.TargetExpired -= OnExpired;
         if (reactionTracker != null) reactionTracker.ReactionMeasured -= OnReaction;
     }
@@ -154,6 +159,12 @@ public class RoundController : MonoBehaviour
         if (State != RoundState.Running) return;
         Stats.RegisterShot(reactionMs, isHit);
         StatsChanged?.Invoke();
+    }
+
+    private void OnShotDetailed(ShotInfo shot)
+    {
+        if (State != RoundState.Running || shot.IsHit) return;
+        Stats.RegisterMiss(shot.MissType);
     }
 
     private void OnExpired()

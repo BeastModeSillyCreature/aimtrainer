@@ -8,6 +8,10 @@ public class Target : MonoBehaviour
 {
     public event Action<Target> Expired;
 
+    // Положение мишени относительно игрока: углы по горизонтали (вправо +) и вертикали (вверх +)
+    public float Yaw => _yaw;
+    public float Pitch => _pitch;
+
     private SpawnArea _area;
     private float _yaw, _pitch, _distance;
     private float _yawVel, _pitchVel;   // угловая скорость, градусов в секунду

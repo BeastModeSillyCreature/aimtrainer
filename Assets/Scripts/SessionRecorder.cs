@@ -9,6 +9,7 @@ public class SessionRecorder : MonoBehaviour
 {
     [SerializeField] private RoundController round;
     [SerializeField] private DDARunner dda;
+    [SerializeField] private BlindZoneTracker blindZones;
     [SerializeField] private string fileName = "profile.json";
     [SerializeField] private string databaseFileName = "profile.db";
 
@@ -25,6 +26,7 @@ public class SessionRecorder : MonoBehaviour
     {
         if (round == null) round = FindFirstObjectByType<RoundController>();
         if (dda == null) dda = FindFirstObjectByType<DDARunner>();
+        if (blindZones == null) blindZones = FindFirstObjectByType<BlindZoneTracker>();
 
         string jsonPath = Path.Combine(Application.persistentDataPath, fileName);
         string storage = jsonPath;
@@ -108,7 +110,9 @@ public class SessionRecorder : MonoBehaviour
             state = state.ToString(),
             targetScale = config.TargetScale,
             targetSpeed = config.TargetSpeed,
-            targetLifetime = config.LifetimeSeconds
+            targetLifetime = config.LifetimeSeconds,
+            undershoots = metrics.Undershoots,
+            overshoots = metrics.Overshoots
         });
     }
 
@@ -125,6 +129,10 @@ public class SessionRecorder : MonoBehaviour
         _current.accuracy = stats.Accuracy;
         _current.avgTimeToHitMs = stats.AvgTimeToHitMs;
         _current.avgReactionMs = stats.AvgReactionMs;
+        _current.undershoots = stats.Undershoots;
+        _current.overshoots = stats.Overshoots;
+        _current.otherMisses = stats.OtherMisses;
+        if (blindZones != null) blindZones.Map.WriteTo(_current);
 
         int count = Profile.sessions.Count;
         PreviousSession = count > 0 ? Profile.sessions[count - 1] : null;

@@ -19,6 +19,18 @@ public class WindowRecord
     public float targetScale;
     public float targetSpeed;
     public float targetLifetime;
+    public int undershoots;        // промахи "недовёл" в окне (FR-3)
+    public int overshoots;         // промахи "проскочил" в окне (FR-3)
+}
+
+// Клетка карты слепых зон (FR-4): сколько попыток и промахов по мишеням в этой области
+[Serializable]
+public class HeatCellRecord
+{
+    public int col;                // 0 слева направо
+    public int row;                // 0 снизу вверх
+    public int attempts;
+    public int misses;
 }
 
 // Один раунд
@@ -35,6 +47,12 @@ public class SessionRecord
     public float accuracy;         // проценты 0..100
     public float avgTimeToHitMs;
     public float avgReactionMs;
+    public int undershoots;        // промахи по типу за раунд (FR-3)
+    public int overshoots;
+    public int otherMisses;
+    public int heatCols;           // размер сетки карты слепых зон (FR-4)
+    public int heatRows;
+    public List<HeatCellRecord> heatCells = new List<HeatCellRecord>();
     public List<WindowRecord> windows = new List<WindowRecord>();
 }
 

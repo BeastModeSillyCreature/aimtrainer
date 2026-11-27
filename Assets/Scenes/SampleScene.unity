@@ -140,6 +140,8 @@ GameObject:
   - component: {fileID: 280164480}
   - component: {fileID: 280164482}
   - component: {fileID: 280164481}
+  - component: {fileID: 280164484}
+  - component: {fileID: 280164483}
   m_Layer: 0
   m_Name: managers
   m_TagString: Untagged
@@ -193,6 +195,7 @@ MonoBehaviour:
   spawner: {fileID: 0}
   look: {fileID: 0}
   round: {fileID: 0}
+  aimTracker: {fileID: 0}
   cam: {fileID: 0}
 --- !u!114 &280164473
 MonoBehaviour:
@@ -259,6 +262,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RoundController
   roundDuration: 60
+  countdownSeconds: 5
   spawner: {fileID: 0}
   shooting: {fileID: 0}
   look: {fileID: 0}
@@ -358,8 +362,41 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SessionRecorder
   round: {fileID: 0}
   dda: {fileID: 0}
+  blindZones: {fileID: 0}
   fileName: profile.json
   databaseFileName: profile.db
+--- !u!114 &280164483
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 280164468}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 584b0623ecb33604ab5ec5a87a45d752, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BlindZoneTracker
+  shooting: {fileID: 0}
+  spawner: {fileID: 0}
+  round: {fileID: 0}
+--- !u!114 &280164484
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 280164468}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a581de336205f0345835a97521f8dfc8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AimTracker
+  look: {fileID: 0}
+  minSpeedDegPerSec: 30
+  memorySeconds: 0.25
+  smoothingSeconds: 0.06
+  lateralThreshold: 0.3
 --- !u!1 &330585543
 GameObject:
   m_ObjectHideFlags: 0

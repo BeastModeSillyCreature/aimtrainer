@@ -9,6 +9,7 @@ using UnityEngine;
 
 // ---------- Таблицы (схема БД) ----------
 // Profile (1) ---- (много) Sessions (1) ---- (много) Windows
+//                                  (1) ---- (много) HeatCells
 
 [Table("Profile")]
 public class ProfileRow
@@ -31,6 +32,11 @@ public class SessionRow
     public float Accuracy { get; set; }
     public float AvgTimeToHitMs { get; set; }
     public float AvgReactionMs { get; set; }
+    public int Undershoots { get; set; }
+    public int Overshoots { get; set; }
+    public int OtherMisses { get; set; }
+    public int HeatCols { get; set; }
+    public int HeatRows { get; set; }
 }
 
 [Table("Windows")]
@@ -47,6 +53,20 @@ public class WindowRow
     public float TargetScale { get; set; }
     public float TargetSpeed { get; set; }
     public float TargetLifetime { get; set; }
+    public int Undershoots { get; set; }
+    public int Overshoots { get; set; }
+}
+
+// Карта слепых зон (FR-4): непустые клетки сетки для каждого раунда
+[Table("HeatCells")]
+public class HeatCellRow
+{
+    [PrimaryKey, AutoIncrement] public int Id { get; set; }
+    [Indexed] public string SessionId { get; set; }   // внешний ключ -> Sessions.Id
+    public int Col { get; set; }
+    public int Row { get; set; }
+    public int Attempts { get; set; }
+    public int Misses { get; set; }
 }
 
 public sealed class SqliteProfileRepository : IProfileRepository, IDisposable
@@ -62,6 +82,7 @@ public sealed class SqliteProfileRepository : IProfileRepository, IDisposable
         _db.CreateTable<ProfileRow>();
         _db.CreateTable<SessionRow>();
         _db.CreateTable<WindowRow>();
+        _db.CreateTable<HeatCellRow>(); // новые колонки и таблицы в старой базе добавляются автоматически
     }
 
     public PlayerProfile Load()
@@ -141,6 +162,20 @@ public sealed class SqliteProfileRepository : IProfileRepository, IDisposable
             foreach (WindowRow windowRow in windowRows)
                 session.windows.Add(ToRecord(windowRow));
 
+            List<HeatCellRow> cellRows = _db.Table<HeatCellRow>()
+                .Where(c => c.SessionId == sessionId)
+                .ToList();
+            foreach (HeatCellRow cellRow in cellRows)
+            {
+                session.heatCells.Add(new HeatCellRecord
+                {
+                    col = cellRow.Col,
+                    row = cellRow.Row,
+                    attempts = cellRow.Attempts,
+                    misses = cellRow.Misses
+                });
+            }
+
             profile.sessions.Add(session);
         }
         return profile;
@@ -161,8 +196,25 @@ public sealed class SqliteProfileRepository : IProfileRepository, IDisposable
             ExpiredTargets = s.expiredTargets,
             Accuracy = s.accuracy,
             AvgTimeToHitMs = s.avgTimeToHitMs,
-            AvgReactionMs = s.avgReactionMs
+            AvgReactionMs = s.avgReactionMs,
+            Undershoots = s.undershoots,
+            Overshoots = s.overshoots,
+            OtherMisses = s.otherMisses,
+            HeatCols = s.heatCols,
+            HeatRows = s.heatRows
         });
+
+        foreach (HeatCellRecord c in s.heatCells)
+        {
+            _db.Insert(new HeatCellRow
+            {
+                SessionId = s.id,
+                Col = c.col,
+                Row = c.row,
+                Attempts = c.attempts,
+                Misses = c.misses
+            });
+        }
 
         foreach (WindowRecord w in s.windows)
         {
@@ -177,7 +229,9 @@ public sealed class SqliteProfileRepository : IProfileRepository, IDisposable
                 State = w.state,
                 TargetScale = w.targetScale,
                 TargetSpeed = w.targetSpeed,
-                TargetLifetime = w.targetLifetime
+                TargetLifetime = w.targetLifetime,
+                Undershoots = w.undershoots,
+                Overshoots = w.overshoots
             });
         }
     }
@@ -197,7 +251,12 @@ public sealed class SqliteProfileRepository : IProfileRepository, IDisposable
             expiredTargets = r.ExpiredTargets,
             accuracy = r.Accuracy,
             avgTimeToHitMs = r.AvgTimeToHitMs,
-            avgReactionMs = r.AvgReactionMs
+            avgReactionMs = r.AvgReactionMs,
+            undershoots = r.Undershoots,
+            overshoots = r.Overshoots,
+            otherMisses = r.OtherMisses,
+            heatCols = r.HeatCols,
+            heatRows = r.HeatRows
         };
     }
 
@@ -213,7 +272,9 @@ public sealed class SqliteProfileRepository : IProfileRepository, IDisposable
             state = r.State,
             targetScale = r.TargetScale,
             targetSpeed = r.TargetSpeed,
-            targetLifetime = r.TargetLifetime
+            targetLifetime = r.TargetLifetime,
+            undershoots = r.Undershoots,
+            overshoots = r.Overshoots
         };
     }
 }

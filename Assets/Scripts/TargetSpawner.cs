@@ -13,10 +13,14 @@ public class TargetSpawner : MonoBehaviour
     // Событие: мишень исчезла сама (игрок не успел)
     public event Action TargetExpired;
 
+    // То же, но с положением мишени в момент исчезновения (для карты слепых зон)
+    public event Action<float, float> TargetExpiredAt;
+
     // Событие: появилась новая мишень
     public event Action TargetSpawned;
 
     public TargetConfiguration Config { get; private set; } = new TargetConfiguration(0.8f, 4.5f, 2.0f);
+    public SpawnArea Area => area;
     public Target CurrentTarget { get; private set; }
     public float LastSpawnTime { get; private set; }
 
@@ -82,6 +86,7 @@ public class TargetSpawner : MonoBehaviour
 
     private void HandleExpired(Target target)
     {
+        TargetExpiredAt?.Invoke(target.Yaw, target.Pitch);
         HideTarget();
         _respawnAt = Time.time + respawnDelay;
         TargetExpired?.Invoke();

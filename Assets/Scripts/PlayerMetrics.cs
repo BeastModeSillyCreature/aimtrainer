@@ -5,11 +5,15 @@ public readonly struct PlayerMetrics
     public readonly float HitRate;        // точность, 0..1
     public readonly float AvgReactionMs;  // среднее время реакции, мс
     public readonly int ShotCount;        // сколько выстрелов в окне
+    public readonly int Undershoots;      // промахи "недовёл" (FR-3)
+    public readonly int Overshoots;       // промахи "проскочил" (FR-3)
 
-    public PlayerMetrics(float hitRate, float avgReactionMs, int shotCount)
+    public PlayerMetrics(float hitRate, float avgReactionMs, int shotCount, int undershoots, int overshoots)
     {
         HitRate = hitRate;
         AvgReactionMs = avgReactionMs;
         ShotCount = shotCount;
+        Undershoots = undershoots;
+        Overshoots = overshoots;
     }
 }

@@ -11,6 +11,11 @@ public sealed class RoundStats
     public int Hits { get; private set; }
     public int ExpiredTargets { get; private set; }
 
+    // Промахи по типу (FR-3)
+    public int Undershoots { get; private set; }
+    public int Overshoots { get; private set; }
+    public int OtherMisses { get; private set; }
+
     public float Accuracy => Shots > 0 ? 100f * Hits / Shots : 0f;
     public float AvgTimeToHitMs => Hits > 0 ? _timeToHitSumMs / Hits : 0f;
     public float AvgReactionMs => _reactionCount > 0 ? _reactionSumMs / _reactionCount : 0f;
@@ -31,6 +36,16 @@ public sealed class RoundStats
         _reactionCount++;
     }
 
+    public void RegisterMiss(MissType type)
+    {
+        switch (type)
+        {
+            case MissType.Undershoot: Undershoots++; break;
+            case MissType.Overshoot: Overshoots++; break;
+            case MissType.Other: OtherMisses++; break;
+        }
+    }
+
     public void RegisterExpired()
     {
         ExpiredTargets++;
@@ -44,5 +59,8 @@ public sealed class RoundStats
         Shots = 0;
         Hits = 0;
         ExpiredTargets = 0;
+        Undershoots = 0;
+        Overshoots = 0;
+        OtherMisses = 0;
     }
 }

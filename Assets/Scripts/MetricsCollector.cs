@@ -26,13 +26,13 @@ public class MetricsCollector : MonoBehaviour
 
     private void Start()
     {
-        shooting.ShotFired += OnShot;
+        shooting.ShotDetailed += OnShot;
         round.RoundStarted += OnRoundStarted;
     }
 
     private void OnDestroy()
     {
-        if (shooting != null) shooting.ShotFired -= OnShot;
+        if (shooting != null) shooting.ShotDetailed -= OnShot;
         if (round != null) round.RoundStarted -= OnRoundStarted;
     }
 
@@ -42,10 +42,10 @@ public class MetricsCollector : MonoBehaviour
         _windowTimer = 0f;
     }
 
-    private void OnShot(float reactionMs, bool isHit)
+    private void OnShot(ShotInfo shot)
     {
         if (round.State != RoundState.Running) return;
-        _processor.RegisterInput(reactionMs, isHit);
+        _processor.RegisterShot(shot);
     }
 
     private void Update()
@@ -61,7 +61,7 @@ public class MetricsCollector : MonoBehaviour
         _processor.Reset();
 
         if (logToConsole)
-            Debug.Log($"[Metrics] shots={metrics.ShotCount}, hitRate={metrics.HitRate:P0}, avgTimeToHit={metrics.AvgReactionMs:F0} ms");
+            Debug.Log($"[Metrics] shots={metrics.ShotCount}, hitRate={metrics.HitRate:P0}, avgTimeToHit={metrics.AvgReactionMs:F0} ms, undershoot={metrics.Undershoots}, overshoot={metrics.Overshoots}");
 
         WindowCompleted?.Invoke(metrics);
     }

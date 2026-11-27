@@ -9,6 +9,8 @@ public sealed class InputProcessor : IInputProcessor
     private float _reactionSumMs;
     private int _hits;
     private int _shots;
+    private int _undershoots;
+    private int _overshoots;
 
     public int ShotCount => _shots;
 
@@ -19,6 +21,17 @@ public sealed class InputProcessor : IInputProcessor
         _reactionSumMs += reactionTimeMs;
         _shots++;
         if (isHit) _hits++;
+    }
+
+    // Выстрел с подробностями: учитывает попадание/время (как RegisterInput) и тип промаха (FR-3)
+    public void RegisterShot(ShotInfo shot)
+    {
+        int before = _shots;
+        RegisterInput(shot.TimeToHitMs, shot.IsHit);
+
+        if (_shots == before || shot.IsHit) return; // выстрел отброшен фильтром или это попадание
+        if (shot.MissType == MissType.Undershoot) _undershoots++;
+        else if (shot.MissType == MissType.Overshoot) _overshoots++;
     }
 
     // Вектор признаков для модели: [точность, среднее время реакции]
@@ -33,7 +46,7 @@ public sealed class InputProcessor : IInputProcessor
     {
         float hitRate = _shots > 0 ? (float)_hits / _shots : 0f;
         float avgReaction = _shots > 0 ? _reactionSumMs / _shots : 0f;
-        return new PlayerMetrics(hitRate, avgReaction, _shots);
+        return new PlayerMetrics(hitRate, avgReaction, _shots, _undershoots, _overshoots);
     }
 
     public void Reset()
@@ -41,5 +54,7 @@ public sealed class InputProcessor : IInputProcessor
         _reactionSumMs = 0f;
         _hits = 0;
         _shots = 0;
+        _undershoots = 0;
+        _overshoots = 0;
     }
 }
