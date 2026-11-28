@@ -1,6 +1,5 @@
 using System;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 // Выстрел (ЛКМ): луч строго из центра камеры вперёд (туда, где прицел).
 // Стреляет только во время раунда. Сообщает подписчикам:
@@ -15,11 +14,14 @@ public class ShootingController : MonoBehaviour
     [SerializeField] private AimTracker aimTracker;
     [SerializeField] private Camera cam;
 
+    private IInputProvider _input;
+
     public event Action<float, bool> ShotFired; // (timeToHitMs, isHit)
     public event Action<ShotInfo> ShotDetailed;
 
     private void Awake()
     {
+        _input = ServiceLocator.Get<IInputProvider>();
         if (cam == null) cam = Camera.main;
         if (look == null) look = FindFirstObjectByType<PlayerLook>();
         if (spawner == null) spawner = FindFirstObjectByType<TargetSpawner>();
@@ -29,8 +31,7 @@ public class ShootingController : MonoBehaviour
 
     private void Update()
     {
-        Mouse mouse = Mouse.current;
-        if (mouse == null || !mouse.leftButton.wasPressedThisFrame) return;
+        if (!_input.FirePressed) return;
         if (round.State != RoundState.Running) return; // вне раунда выстрелы не считаем
         if (!look.CanShoot) return;                    // курсор не захвачен
 

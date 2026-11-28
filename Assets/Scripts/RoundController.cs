@@ -1,6 +1,5 @@
 using System;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 public enum RoundState
 {
@@ -36,10 +35,12 @@ public class RoundController : MonoBehaviour
     public RoundStats Stats { get; } = new RoundStats();
     public bool IsPaused => (State == RoundState.Running || State == RoundState.Countdown) && Time.timeScale == 0f;
 
+    private IInputProvider _input;
     private float _finishedAt;
 
     private void Awake()
     {
+        _input = ServiceLocator.Get<IInputProvider>();
         if (spawner == null) spawner = FindFirstObjectByType<TargetSpawner>();
         if (shooting == null) shooting = FindFirstObjectByType<ShootingController>();
         if (look == null) look = FindFirstObjectByType<PlayerLook>();
@@ -70,9 +71,7 @@ public class RoundController : MonoBehaviour
     private void Update()
     {
         // R работает только когда меню настроек закрыто
-        Keyboard keyboard = Keyboard.current;
-        bool restartPressed = keyboard != null && keyboard.rKey.wasPressedThisFrame
-                              && look != null && !look.InMenu;
+        bool restartPressed = _input.RestartPressed && look != null && !look.InMenu;
 
         switch (State)
         {
@@ -113,8 +112,7 @@ public class RoundController : MonoBehaviour
 
     private bool ClickedThisFrame()
     {
-        Mouse mouse = Mouse.current;
-        return mouse != null && look.CanShoot && mouse.leftButton.wasPressedThisFrame;
+        return look.CanShoot && _input.FirePressed;
     }
 
     private void BeginCountdown()

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading.Tasks;
 using UnityEngine;
 
 // Хранение профиля в JSON-файле (Application.persistentDataPath/profile.json).
@@ -9,6 +10,7 @@ public sealed class JsonProfileRepository : IProfileRepository
     private const int MaxStoredSessions = 200; // старые раунды удаляются, чтобы файл не рос бесконечно
 
     private readonly string _path;
+    private readonly object _ioLock = new object();
     private PlayerProfile _profile;
 
     public JsonProfileRepository(string path)
@@ -22,14 +24,16 @@ public sealed class JsonProfileRepository : IProfileRepository
         return _profile;
     }
 
-    public void SaveSession(SessionRecord session)
+    public async Task SaveSessionAsync(SessionRecord session)
     {
         PlayerProfile profile = Load();
         profile.sessions.Add(session);
         while (profile.sessions.Count > MaxStoredSessions)
             profile.sessions.RemoveAt(0);
 
-        WriteToDisk(profile);
+        // JsonUtility работает только в главном потоке, поэтому сериализуем здесь, а файл пишем в фоне
+        string json = JsonUtility.ToJson(profile, true);
+        await Task.Run(() => WriteFile(json));
     }
 
     private PlayerProfile ReadFromDisk()
@@ -52,19 +56,21 @@ public sealed class JsonProfileRepository : IProfileRepository
         }
     }
 
-    private void WriteToDisk(PlayerProfile profile)
+    private void WriteFile(string json)
     {
-        try
+        lock (_ioLock)
         {
-            string json = JsonUtility.ToJson(profile, true);
-            string tempPath = _path + ".tmp";
-            File.WriteAllText(tempPath, json);
-            if (File.Exists(_path)) File.Delete(_path);
-            File.Move(tempPath, _path);
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"[Profile] Cannot save profile: {e.Message}");
+            try
+            {
+                string tempPath = _path + ".tmp";
+                File.WriteAllText(tempPath, json);
+                if (File.Exists(_path)) File.Delete(_path);
+                File.Move(tempPath, _path);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[Profile] Cannot save profile: {e.Message}");
+            }
         }
     }
 }

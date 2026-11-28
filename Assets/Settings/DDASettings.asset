@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ea477348536e5b243b184feb4c1c273c, type: 3}
+  m_Name: DDASettings
+  m_EditorClassIdentifier: Assembly-CSharp::DDASettings
+  prediction: 1
+  defaultMode: 1
+  transitionSeconds: 1.5
+  maxInferenceMs: 10
+  onnxModel: {fileID: 5022602860645237092, guid: 64d1b24d5f669d3498455edcbed805a0, type: 3}

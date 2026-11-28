@@ -4,7 +4,7 @@ using UnityEngine;
 // Ядро DDA (ЛР №3, этап 4). Зависит только от интерфейсов.
 // Цепочка: метрики -> признаки -> предсказание -> состояние FSM -> параметры -> валидация.
 // Если предсказание падает, срабатывает резервная стратегия (E-2.1).
-public sealed class AimDDAController : IAIController
+public sealed class AimDDAController : IAIController, IDisposable
 {
     private readonly IPredictionService _prediction;
     private readonly IDecisionStrategy _strategy;
@@ -30,6 +30,11 @@ public sealed class AimDDAController : IAIController
         _strategy = strategy ?? throw new ArgumentNullException(nameof(strategy));
         _fallback = fallback ?? throw new ArgumentNullException(nameof(fallback));
         _validator = validator ?? throw new ArgumentNullException(nameof(validator));
+    }
+
+    public void Dispose()
+    {
+        (_prediction as IDisposable)?.Dispose(); // освободить ресурсы нейросети
     }
 
     public void ResetState(DDAState state)

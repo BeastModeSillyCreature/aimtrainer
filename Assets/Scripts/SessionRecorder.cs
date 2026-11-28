@@ -1,24 +1,21 @@
 using System;
-using System.IO;
 using UnityEngine;
 
 // Записывает ход раунда (окна метрик и ответы DDA) и по окончании сохраняет раунд в профиль.
-// Хранилище подключено через интерфейс IProfileRepository: чтобы перейти на SQLite,
-// достаточно заменить одну строку в Awake.
+// После рефакторинга (ЛР №5) рекордер не знает, где хранятся данные: он работает с фасадом IGameStateStorage.
 public class SessionRecorder : MonoBehaviour
 {
     [SerializeField] private RoundController round;
     [SerializeField] private DDARunner dda;
     [SerializeField] private BlindZoneTracker blindZones;
-    [SerializeField] private string fileName = "profile.json";
-    [SerializeField] private string databaseFileName = "profile.db";
+    [SerializeField] private SessionSavedEvent sessionSavedEvent; // необязательно: канал ScriptableObject
 
     public event Action<SessionRecord> SessionSaved;
 
-    public IProfileRepository Repository { get; private set; }
     public PlayerProfile Profile { get; private set; }
     public SessionRecord PreviousSession { get; private set; } // предыдущий раунд (для сравнения), может быть null
 
+    private IGameStateStorage _storage;
     private SessionRecord _current;
     private float _startTime;
 
@@ -28,35 +25,10 @@ public class SessionRecorder : MonoBehaviour
         if (dda == null) dda = FindFirstObjectByType<DDARunner>();
         if (blindZones == null) blindZones = FindFirstObjectByType<BlindZoneTracker>();
 
-        string jsonPath = Path.Combine(Application.persistentDataPath, fileName);
-        string storage = jsonPath;
-        IProfileRepository repository = null;
+        _storage = ServiceLocator.Get<IGameStateStorage>();
+        Profile = _storage.LoadSession();
 
-#if USE_SQLITE
-        try
-        {
-            string dbPath = Path.Combine(Application.persistentDataPath, databaseFileName);
-            SqliteProfileRepository sqlite = new SqliteProfileRepository(dbPath);
-
-            // Первый запуск с SQLite: переносим раунды из старого profile.json (сам файл остаётся)
-            int imported = sqlite.ImportIfEmpty(new JsonProfileRepository(jsonPath).Load());
-            if (imported > 0) Debug.Log($"[Profile] imported {imported} rounds from JSON into SQLite");
-
-            repository = sqlite;
-            storage = dbPath;
-        }
-        catch (Exception e)
-        {
-            Debug.LogWarning($"[Profile] SQLite is unavailable ({e.Message}). Falling back to JSON.");
-        }
-#endif
-
-        if (repository == null) repository = new JsonProfileRepository(jsonPath);
-
-        Repository = repository;
-        Profile = Repository.Load();
-
-        Debug.Log($"[Profile] storage: {storage}, saved rounds: {Profile.sessions.Count}");
+        Debug.Log($"[Profile] saved rounds: {Profile.sessions.Count}");
     }
 
     private void Start()
@@ -69,8 +41,6 @@ public class SessionRecorder : MonoBehaviour
 
     private void OnDestroy()
     {
-        (Repository as IDisposable)?.Dispose(); // закрыть файл БД
-
         if (round != null)
         {
             round.RoundStarted -= OnRoundStarted;
@@ -137,8 +107,24 @@ public class SessionRecorder : MonoBehaviour
         int count = Profile.sessions.Count;
         PreviousSession = count > 0 ? Profile.sessions[count - 1] : null;
 
-        Repository.SaveSession(_current);
+        // Профиль в памяти обновляется сразу, запись на диск идёт в фоне
+        SaveInBackground(_current);
+
         SessionSaved?.Invoke(_current);
+        if (sessionSavedEvent != null) sessionSavedEvent.Raise(_current);
         _current = null;
+    }
+
+    // Запустить сохранение и не ждать: главный поток не блокируется, ошибка попадает в Console
+    private async void SaveInBackground(SessionRecord session)
+    {
+        try
+        {
+            await _storage.SaveSessionAsync(session);
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[Profile] Cannot save round: {e.Message}");
+        }
     }
 }

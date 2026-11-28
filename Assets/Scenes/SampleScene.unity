@@ -142,6 +142,7 @@ GameObject:
   - component: {fileID: 280164481}
   - component: {fileID: 280164484}
   - component: {fileID: 280164483}
+  - component: {fileID: 280164485}
   m_Layer: 0
   m_Name: managers
   m_TagString: Untagged
@@ -176,7 +177,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1fc663953d2ddb441962f0e209a40c22, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ArenaBuilder
-  watermarkText: Zorin / Bondarenko / Korobkov
+  watermarkText: 'Zorin / Bondarenko / Korobkov
+
+    better aimtrainer part 1'
   watermarkHeight: 7
   watermarkSize: 0.25
   watermarkColor: {r: 1, g: 1, b: 1, a: 0.35}
@@ -248,6 +251,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RoundHud
   round: {fileID: 0}
   dda: {fileID: 0}
+  difficultyChangedEvent: {fileID: 11400000, guid: e5bba884f2cf96147863e3f4c4b572b1, type: 2}
   look: {fileID: 0}
 --- !u!114 &280164476
 MonoBehaviour:
@@ -295,13 +299,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8a3e4e517856afe4a99c60cc07e78f26, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DDARunner
-  mode: 0
-  transitionSeconds: 1.5
-  boundsFileName: difficulty_bounds.json
-  onnxModel: {fileID: 5022602860645237092, guid: 64d1b24d5f669d3498455edcbed805a0, type: 3}
+  settings: {fileID: 11400000, guid: ea2bd810c81a3e242bec267efb3cd3c3, type: 2}
+  difficultyChangedEvent: {fileID: 11400000, guid: e5bba884f2cf96147863e3f4c4b572b1, type: 2}
   spawner: {fileID: 0}
   metrics: {fileID: 0}
   round: {fileID: 0}
+  look: {fileID: 0}
 --- !u!114 &280164479
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -348,6 +351,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ResultsPanel
   round: {fileID: 0}
   recorder: {fileID: 0}
+  sessionSavedEvent: {fileID: 11400000, guid: 82d6a9dde2d1b234e9c3b99dd56969f8, type: 2}
 --- !u!114 &280164482
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -363,8 +367,7 @@ MonoBehaviour:
   round: {fileID: 0}
   dda: {fileID: 0}
   blindZones: {fileID: 0}
-  fileName: profile.json
-  databaseFileName: profile.db
+  sessionSavedEvent: {fileID: 11400000, guid: 82d6a9dde2d1b234e9c3b99dd56969f8, type: 2}
 --- !u!114 &280164483
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -397,6 +400,22 @@ MonoBehaviour:
   memorySeconds: 0.25
   smoothingSeconds: 0.06
   lateralThreshold: 0.3
+--- !u!114 &280164485
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 280164468}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ec9202d5df1db5541b4a2ecbf5822e95, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GameBootstrap
+  logRepositoryCalls: 1
+  profileFileName: profile.json
+  databaseFileName: profile.db
+  boundsFileName: difficulty_bounds.json
 --- !u!1 &330585543
 GameObject:
   m_ObjectHideFlags: 0

@@ -1,6 +1,5 @@
 using System;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 // Обзор мышью от первого лица (как в Aim Lab / KovaaK's).
 // Вешается на Main Camera. Курсор скрыт и заблокирован в центре экрана.
@@ -8,6 +7,9 @@ using UnityEngine.InputSystem;
 public class PlayerLook : MonoBehaviour
 {
     [SerializeField] private float maxPitch = 85f;
+
+    private IInputProvider _input;
+    private ISettingsRepository _settings;
 
     private float _yaw;
     private float _pitch;
@@ -24,6 +26,12 @@ public class PlayerLook : MonoBehaviour
 
     public event Action MenuToggled;
 
+    private void Awake()
+    {
+        _input = ServiceLocator.Get<IInputProvider>();
+        _settings = ServiceLocator.Get<ISettingsRepository>();
+    }
+
     private void Start()
     {
         _yaw = transform.eulerAngles.y;
@@ -35,8 +43,7 @@ public class PlayerLook : MonoBehaviour
     {
         CanShoot = false;
 
-        Keyboard keyboard = Keyboard.current;
-        bool escPressed = keyboard != null && keyboard.escapeKey.wasPressedThisFrame;
+        bool escPressed = _input.MenuTogglePressed;
 
         if (!InMenu)
         {
@@ -49,12 +56,10 @@ public class PlayerLook : MonoBehaviour
             Resume();
         }
 
-        Mouse mouse = Mouse.current;
-        if (InMenu || mouse == null) return;
+        if (InMenu) return;
         if (Time.frameCount <= _ignoreInputFrame) return;
 
-        float sensitivity = GameSettings.Sensitivity;
-        Vector2 delta = mouse.delta.ReadValue() * sensitivity;
+        Vector2 delta = _input.LookDelta * _settings.Sensitivity;
         _yaw += delta.x;
         _pitch = Mathf.Clamp(_pitch - delta.y, -maxPitch, maxPitch);
         transform.rotation = Quaternion.Euler(_pitch, _yaw, 0f);
@@ -73,7 +78,7 @@ public class PlayerLook : MonoBehaviour
     public void Resume()
     {
         InMenu = false;
-        GameSettings.Save();
+        _settings.Save();
         LockCursor();
         _ignoreInputFrame = Time.frameCount;      // клик по кнопке не считается выстрелом
         _lockCheckFrame = Time.frameCount + 5;    // даём курсору время заблокироваться

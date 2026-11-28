@@ -1,11 +1,13 @@
+using System.Threading.Tasks;
+
 // Контракт хранилища профиля (паттерн "Репозиторий", ЛР №4).
-// Игра знает только этот интерфейс. Сейчас реализация хранит JSON-файл (JsonProfileRepository),
-// позже можно написать SqliteProfileRepository с теми же методами и подменить одну строку в SessionRecorder.
+// Реализации: JsonProfileRepository, SqliteProfileRepository, декоратор LoggingProfileRepository.
 public interface IProfileRepository
 {
     // Загрузить профиль (если файла нет или он повреждён, возвращает новый пустой профиль)
     PlayerProfile Load();
 
-    // Добавить завершённый раунд и сохранить
-    void SaveSession(SessionRecord session);
+    // Добавить завершённый раунд и сохранить. Раунд сразу попадает в профиль в памяти,
+    // а запись на диск идёт в фоне и не блокирует главный поток.
+    Task SaveSessionAsync(SessionRecord session);
 }

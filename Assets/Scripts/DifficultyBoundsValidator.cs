@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using UnityEngine;
 
 // Границы параметров для одного режима (одна запись в JSON-конфиге геймдизайнера)
@@ -29,19 +28,20 @@ public class DifficultyConfigFile
 }
 
 // Валидация и ограничение параметров (FR-9, FR-10, сценарий 3, E-3.1).
-// Если JSON отсутствует или повреждён, применяются безопасные значения по умолчанию и выводится предупреждение.
+// Границы приходят из хранилища (фасада). Если JSON отсутствует или повреждён, применяются безопасные значения
+// по умолчанию и выводится предупреждение. Reload() перечитывает конфиг: его вызывают на паузе, чтобы правки
+// геймдизайнера применялись без перезапуска игры.
 public sealed class DifficultyBoundsValidator : IDifficultyValidator
 {
+    private readonly IGameStateStorage _storage;
     private readonly ModeBounds[] _bounds = new ModeBounds[3]; // по индексу DDAMode
 
     public DDAMode Mode { get; set; } = DDAMode.Aggressive;
 
-    public DifficultyBoundsValidator(string jsonPath)
+    public DifficultyBoundsValidator(IGameStateStorage storage)
     {
-        for (int i = 0; i < _bounds.Length; i++)
-            _bounds[i] = CreateDefaults((DDAMode)i);
-
-        LoadFromFile(jsonPath);
+        _storage = storage ?? throw new ArgumentNullException(nameof(storage));
+        Reload();
     }
 
     public TargetConfiguration ValidateAndClamp(TargetConfiguration config)
@@ -53,16 +53,15 @@ public sealed class DifficultyBoundsValidator : IDifficultyValidator
             Mathf.Clamp(config.LifetimeSeconds, b.minLifetime, b.maxLifetime));
     }
 
-    private void LoadFromFile(string path)
+    public void Reload()
     {
+        for (int i = 0; i < _bounds.Length; i++)
+            _bounds[i] = CreateDefaults((DDAMode)i);
+
         try
         {
-            string json = File.ReadAllText(path);
-            DifficultyConfigFile file = JsonUtility.FromJson<DifficultyConfigFile>(json);
-            if (file == null || file.modes == null)
-                throw new Exception("no 'modes' array in JSON");
-
-            foreach (ModeBounds m in file.modes)
+            ModeBounds[] loaded = _storage.LoadBounds();
+            foreach (ModeBounds m in loaded)
             {
                 if (!Enum.TryParse(m.mode, out DDAMode parsed) || !m.IsValid())
                 {
@@ -75,7 +74,7 @@ public sealed class DifficultyBoundsValidator : IDifficultyValidator
         catch (Exception e)
         {
             // E-3.1: файл отсутствует или повреждён -> зашитые безопасные константы
-            Debug.LogWarning($"[DDA] Cannot read bounds config ({path}): {e.Message}. Using built-in defaults.");
+            Debug.LogWarning($"[DDA] Cannot read bounds config: {e.Message}. Using built-in defaults.");
         }
     }
 

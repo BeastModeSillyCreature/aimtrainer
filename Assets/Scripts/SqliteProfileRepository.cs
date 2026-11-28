@@ -4,6 +4,7 @@
 #if USE_SQLITE
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using SQLite;
 using UnityEngine;
 
@@ -74,6 +75,7 @@ public sealed class SqliteProfileRepository : IProfileRepository, IDisposable
     private const int MaxLoadedSessions = 200; // в памяти держим последние раунды, в БД хранятся все
 
     private readonly SQLiteConnection _db;
+    private readonly object _dbLock = new object(); // соединение SQLite не потокобезопасно: все обращения под блокировкой
     private PlayerProfile _profile;
 
     public SqliteProfileRepository(string databasePath)
@@ -91,23 +93,29 @@ public sealed class SqliteProfileRepository : IProfileRepository, IDisposable
         return _profile;
     }
 
-    public void SaveSession(SessionRecord session)
+    public Task SaveSessionAsync(SessionRecord session)
     {
+        // Профиль в памяти обновляется сразу (в главном потоке), запись в базу идёт в фоне
         PlayerProfile profile = Load();
-
-        try
-        {
-            // Раунд и его окна записываются одной транзакцией: либо всё, либо ничего
-            _db.RunInTransaction(() => InsertSession(session));
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"[Profile] Cannot save round to SQLite: {e.Message}");
-        }
-
         profile.sessions.Add(session);
         while (profile.sessions.Count > MaxLoadedSessions)
             profile.sessions.RemoveAt(0);
+
+        return Task.Run(() =>
+        {
+            lock (_dbLock)
+            {
+                try
+                {
+                    // Раунд и его окна записываются одной транзакцией: либо всё, либо ничего
+                    _db.RunInTransaction(() => InsertSession(session));
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError($"[Profile] Cannot save round to SQLite: {e.Message}");
+                }
+            }
+        });
     }
 
     // Первый запуск с SQLite: переносим раунды из старого JSON-профиля (если БД ещё пуста)
@@ -128,7 +136,10 @@ public sealed class SqliteProfileRepository : IProfileRepository, IDisposable
 
     public void Dispose()
     {
-        _db.Close();
+        lock (_dbLock) // дождаться завершения фоновой записи
+        {
+            _db.Close();
+        }
     }
 
     // ---------- Чтение ----------

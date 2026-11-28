@@ -1,109 +1,129 @@
 using System;
-using System.IO;
 using UnityEngine;
-using UnityEngine.InputSystem;
-#if USE_ONNX
-using Unity.InferenceEngine;
-#endif
 
-// Точка сборки модуля DDA в Unity: создаёт все объекты, подписывается на метрики
-// и каждый кадр передаёт плавно меняющиеся параметры в спавнер.
+// Точка сборки модуля DDA в Unity. После рефакторинга (ЛР №5) класс стал короче и не знает про конкретные реализации:
+//  - ввод берёт из IInputProvider, границы сложности из хранилища (IGameStateStorage);
+//  - стратегии создаёт StrategyFactory по ассету DDASettings;
+//  - об изменении сложности сообщает событиями (OnDifficultyChanged и канал ScriptableObject).
+// Горячая замена: смена ассета DDASettings или типа сервиса предсказания в Play Mode пересобирает контроллер на лету.
 // Клавиши 1 / 2 / 3: режим Soft / Aggressive / Fixed.
 public class DDARunner : MonoBehaviour
 {
-    [SerializeField] private DDAMode mode = DDAMode.Aggressive;
-    [SerializeField] private float transitionSeconds = 1.5f;
-    [SerializeField] private string boundsFileName = "difficulty_bounds.json";
-#if USE_ONNX
-    [SerializeField] private ModelAsset onnxModel; // сюда перетащить dda_model.onnx
-#endif
+    [SerializeField] private DDASettings settings;
+    [SerializeField] private DifficultyChangedEvent difficultyChangedEvent; // необязательно: канал ScriptableObject
     [SerializeField] private TargetSpawner spawner;
     [SerializeField] private MetricsCollector metrics;
     [SerializeField] private RoundController round;
+    [SerializeField] private PlayerLook look;
 
     public event Action Changed; // изменилось состояние или режим
+
+    // US-3: сложность изменилась (с параметрами для подписчиков)
+    public event Action<DifficultyChange> OnDifficultyChanged;
 
     // Окно метрик обработано: метрики, состояние FSM и параметры мишени (для записи в профиль)
     public event Action<PlayerMetrics, DDAState, TargetConfiguration> WindowProcessed;
 
     public DDAState State => _controller.CurrentState;
-    public DDAMode Mode => mode;
+    public DDAMode Mode => _mode;
 
-    private IAIController _controller;
-    private IPredictionService _prediction;
+    private IInputProvider _input;
+    private IGameStateStorage _storage;
+    private DDASettings _defaultSettings; // создаётся, если ассет не назначен
     private DifficultyBoundsValidator _validator;
+    private IAIController _controller;
     private IGameplayInteractor _interactor;
     private ConfigSmoother _smoother;
+    private DDAMode _mode;
+
+    // Что применено сейчас (нужно, чтобы заметить смену настроек в Play Mode)
+    private DDASettings _appliedSettings;
+    private PredictionServiceType _appliedPrediction;
+    private UnityEngine.Object _appliedModel;
+
+    private DDASettings Current => settings != null ? settings : _defaultSettings;
 
     private void Awake()
     {
         if (spawner == null) spawner = FindFirstObjectByType<TargetSpawner>();
         if (metrics == null) metrics = FindFirstObjectByType<MetricsCollector>();
         if (round == null) round = FindFirstObjectByType<RoundController>();
+        if (look == null) look = FindFirstObjectByType<PlayerLook>();
 
-        string path = Path.Combine(Application.streamingAssetsPath, boundsFileName);
-        _validator = new DifficultyBoundsValidator(path) { Mode = mode };
+        _input = ServiceLocator.Get<IInputProvider>();
+        _storage = ServiceLocator.Get<IGameStateStorage>();
 
-        _prediction = CreatePredictionService();
-        _controller = new AimDDAController(
-            _prediction,
-            new FsmDecisionStrategy(),
-            new LinearFallbackDecisionStrategy(),
-            _validator);
+        if (settings == null)
+        {
+            _defaultSettings = ScriptableObject.CreateInstance<DDASettings>();
+            Debug.LogWarning("[DDA] DDASettings is not assigned in DDARunner: using default settings");
+        }
+
+        _mode = Current.defaultMode;
+        _validator = new DifficultyBoundsValidator(_storage) { Mode = _mode };
+        BuildController();
 
         _interactor = new SpawnerInteractor(spawner);
-        _smoother = new ConfigSmoother(_controller.GetCurrentConfiguration(), transitionSeconds);
+        _smoother = new ConfigSmoother(_controller.GetCurrentConfiguration(), Current.transitionSeconds);
         _interactor.ApplyConfiguration(_smoother.Current);
-    }
-
-    // Выбор сервиса предсказания: нейросеть ONNX, а если её нет или она не загрузилась, эвристика
-    private IPredictionService CreatePredictionService()
-    {
-#if USE_ONNX
-        if (onnxModel != null)
-        {
-            try
-            {
-                IPredictionService onnx = new OnnxPredictionService(onnxModel);
-                Debug.Log("[DDA] Prediction service: ONNX neural network");
-                return onnx;
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning($"[DDA] Cannot load ONNX model ({e.Message}). Using heuristic instead.");
-            }
-        }
-        else
-        {
-            Debug.LogWarning("[DDA] ONNX model is not assigned in DDARunner. Using heuristic instead.");
-        }
-#endif
-        Debug.Log("[DDA] Prediction service: heuristic");
-        return new HeuristicPredictionService();
     }
 
     private void Start()
     {
         metrics.WindowCompleted += OnWindow;
         round.RoundStarted += OnRoundStarted;
+        look.MenuToggled += OnMenuToggled;
     }
 
     private void OnDestroy()
     {
-        (_prediction as IDisposable)?.Dispose(); // освободить ресурсы нейросети
+        (_controller as IDisposable)?.Dispose();
+        if (_defaultSettings != null) Destroy(_defaultSettings);
+
         if (metrics != null) metrics.WindowCompleted -= OnWindow;
         if (round != null) round.RoundStarted -= OnRoundStarted;
+        if (look != null) look.MenuToggled -= OnMenuToggled;
     }
 
     private void Update()
     {
+        CheckSettingsChanged();
         HandleModeKeys();
         _interactor.ApplyConfiguration(_smoother.Tick(Time.deltaTime));
     }
 
+    // Собирает контроллер по текущим настройкам; состояние FSM сохраняется
+    private void BuildController()
+    {
+        DDASettings s = Current;
+        DDAState state = _controller != null ? _controller.CurrentState : DDAState.Medium;
+
+        (_controller as IDisposable)?.Dispose();
+
+        AimDDAController controller = StrategyFactory.CreateController(s, _validator);
+        controller.ResetState(state);
+        _controller = controller;
+
+        _appliedSettings = s;
+        _appliedPrediction = s.prediction;
+        _appliedModel = s.ModelReference;
+    }
+
+    // Горячая замена: другой ассет, другой тип сервиса или другая модель
+    private void CheckSettingsChanged()
+    {
+        DDASettings s = Current;
+        if (s == _appliedSettings && s.prediction == _appliedPrediction && s.ModelReference == _appliedModel) return;
+
+        BuildController();
+        _smoother.SetTarget(_controller.GetCurrentConfiguration());
+        Debug.Log($"[DDA] Settings changed in Play Mode: prediction={s.prediction}");
+        Publish(default, _controller.GetCurrentConfiguration());
+    }
+
     private void OnWindow(PlayerMetrics m)
     {
-        if (mode == DDAMode.Fixed)
+        if (_mode == DDAMode.Fixed)
         {
             // В режиме Fixed сложность не меняется, но окно всё равно попадает в историю раунда
             WindowProcessed?.Invoke(m, _controller.CurrentState, _controller.GetCurrentConfiguration());
@@ -113,10 +133,11 @@ public class DDARunner : MonoBehaviour
         TargetConfiguration target = _controller.UpdateDifficulty(m);
         _smoother.SetTarget(target);
 
-        Debug.Log($"[DDA] state={_controller.CurrentState}, mode={mode}, " +
+        Debug.Log($"[DDA] state={_controller.CurrentState}, mode={_mode}, " +
                   $"scale={target.TargetScale:F2}, speed={target.TargetSpeed:F1}, lifetime={target.LifetimeSeconds:F1}");
+
         WindowProcessed?.Invoke(m, _controller.CurrentState, target);
-        Changed?.Invoke();
+        Publish(m, target);
     }
 
     private void OnRoundStarted()
@@ -125,28 +146,47 @@ public class DDARunner : MonoBehaviour
         _controller.ResetState(DDAState.Medium);
         _smoother.Snap(_controller.GetCurrentConfiguration());
         _interactor.ApplyConfiguration(_smoother.Current);
-        Changed?.Invoke();
+        Publish(default, _smoother.Current);
+    }
+
+    // Меню закрыто: перечитываем границы сложности из JSON, правки геймдизайнера применяются сразу
+    private void OnMenuToggled()
+    {
+        if (look.InMenu) return;
+
+        _validator.Reload();
+        _smoother.SetTarget(_controller.GetCurrentConfiguration());
+        Publish(default, _controller.GetCurrentConfiguration());
     }
 
     private void HandleModeKeys()
     {
-        Keyboard kb = Keyboard.current;
-        if (kb == null) return;
-
-        if (kb.digit1Key.wasPressedThisFrame) SetMode(DDAMode.Soft);
-        else if (kb.digit2Key.wasPressedThisFrame) SetMode(DDAMode.Aggressive);
-        else if (kb.digit3Key.wasPressedThisFrame) SetMode(DDAMode.Fixed);
+        switch (_input.ModeKeyPressed)
+        {
+            case 1: SetMode(DDAMode.Soft); break;
+            case 2: SetMode(DDAMode.Aggressive); break;
+            case 3: SetMode(DDAMode.Fixed); break;
+        }
     }
 
     private void SetMode(DDAMode newMode)
     {
-        if (newMode == mode) return;
+        if (newMode == _mode) return;
 
-        mode = newMode;
+        _mode = newMode;
         _validator.Mode = newMode;
         if (newMode == DDAMode.Fixed) _controller.ResetState(DDAState.Medium);
 
         _smoother.SetTarget(_controller.GetCurrentConfiguration());
+        Publish(default, _controller.GetCurrentConfiguration());
+    }
+
+    // Сообщить всем подписчикам: событие C#, событие US-3 и канал ScriptableObject
+    private void Publish(PlayerMetrics metricsSnapshot, TargetConfiguration config)
+    {
+        DifficultyChange change = new DifficultyChange(_controller.CurrentState, _mode, config, metricsSnapshot);
+        OnDifficultyChanged?.Invoke(change);
+        if (difficultyChangedEvent != null) difficultyChangedEvent.Raise(change);
         Changed?.Invoke();
     }
 }

@@ -14,6 +14,7 @@ public class ResultsPanel : MonoBehaviour
 
     [SerializeField] private RoundController round;
     [SerializeField] private SessionRecorder recorder;
+    [SerializeField] private SessionSavedEvent sessionSavedEvent; // необязательно: если не назначен, берём событие рекордера
 
     private static readonly Color[] StateColors =
     {
@@ -48,12 +49,14 @@ public class ResultsPanel : MonoBehaviour
 
     private void Start()
     {
-        recorder.SessionSaved += Show;
+        if (sessionSavedEvent != null) sessionSavedEvent.Subscribe(Show);
+        else recorder.SessionSaved += Show;
         round.CountdownStarted += Hide;
     }
 
     private void OnDestroy()
     {
+        if (sessionSavedEvent != null) sessionSavedEvent.Unsubscribe(Show);
         if (recorder != null) recorder.SessionSaved -= Show;
         if (round != null) round.CountdownStarted -= Hide;
     }

@@ -15,11 +15,13 @@ public class SettingsMenu : MonoBehaviour
     private Slider _sensSlider;
     private Slider _dpiSlider;
     private Font _font;
+    private ISettingsRepository _settings;
 
     private void Awake()
     {
         if (look == null) look = FindFirstObjectByType<PlayerLook>();
         _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        _settings = ServiceLocator.Get<ISettingsRepository>();
         EnsureEventSystem();
         BuildUi();
     }
@@ -42,48 +44,48 @@ public class SettingsMenu : MonoBehaviour
 
     private void SyncFromSettings()
     {
-        _sensSlider.SetValueWithoutNotify(Mathf.Round(GameSettings.Sensitivity * 10000f));
-        _dpiSlider.SetValueWithoutNotify(GameSettings.Dpi / 100f);
+        _sensSlider.SetValueWithoutNotify(Mathf.Round(_settings.Sensitivity * 10000f));
+        _dpiSlider.SetValueWithoutNotify(_settings.Dpi / 100f);
         UpdateLabels();
     }
 
     private void UpdateLabels()
     {
-        _sensLabel.text = $"Sensitivity: {GameSettings.Sensitivity:F4} deg/count";
-        _dpiLabel.text = $"Mouse DPI: {GameSettings.Dpi}   =   {GameSettings.CmPer360:F1} cm/360";
+        _sensLabel.text = $"Sensitivity: {_settings.Sensitivity:F4} deg/count";
+        _dpiLabel.text = $"Mouse DPI: {_settings.Dpi}   =   {_settings.CmPer360:F1} cm/360";
     }
 
     private void OnSensChanged(float value)
     {
-        GameSettings.Sensitivity = value / 10000f;
+        _settings.Sensitivity = value / 10000f;
         UpdateLabels();
     }
 
     // Шаг чувствительности ровно 0.0001 (при удержании кнопки умножается на множитель)
     private void NudgeSensitivity(int steps)
     {
-        float current = Mathf.Round(GameSettings.Sensitivity * 10000f);
-        GameSettings.Sensitivity = (current + steps) / 10000f;
-        _sensSlider.SetValueWithoutNotify(Mathf.Round(GameSettings.Sensitivity * 10000f));
+        float current = Mathf.Round(_settings.Sensitivity * 10000f);
+        _settings.Sensitivity = (current + steps) / 10000f;
+        _sensSlider.SetValueWithoutNotify(Mathf.Round(_settings.Sensitivity * 10000f));
         UpdateLabels();
     }
 
     private void NudgeDpi(int direction)
     {
-        GameSettings.Dpi = Mathf.Clamp(GameSettings.Dpi + direction * 100, 400, 3200);
-        _dpiSlider.SetValueWithoutNotify(GameSettings.Dpi / 100f);
+        _settings.Dpi = Mathf.Clamp(_settings.Dpi + direction * 100, 400, 3200);
+        _dpiSlider.SetValueWithoutNotify(_settings.Dpi / 100f);
         UpdateLabels();
     }
 
     private void OnDpiChanged(float value)
     {
-        GameSettings.Dpi = Mathf.RoundToInt(value) * 100;
+        _settings.Dpi = Mathf.RoundToInt(value) * 100;
         UpdateLabels();
     }
 
     private void Quit()
     {
-        GameSettings.Save();
+        _settings.Save();
 #if UNITY_EDITOR
         UnityEditor.EditorApplication.isPlaying = false;
 #else

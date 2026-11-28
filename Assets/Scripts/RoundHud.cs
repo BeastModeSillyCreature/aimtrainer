@@ -8,6 +8,7 @@ public class RoundHud : MonoBehaviour
 {
     [SerializeField] private RoundController round;
     [SerializeField] private DDARunner dda;
+    [SerializeField] private DifficultyChangedEvent difficultyChangedEvent; // необязательно: иначе берём событие DDARunner
     [SerializeField] private PlayerLook look;
 
     private Text _stats;
@@ -29,7 +30,8 @@ public class RoundHud : MonoBehaviour
         round.RoundStarted += Refresh;
         round.RoundFinished += Refresh;
         round.StatsChanged += Refresh;
-        if (dda != null) dda.Changed += Refresh;
+        if (difficultyChangedEvent != null) difficultyChangedEvent.Subscribe(OnDifficultyChanged);
+        else if (dda != null) dda.Changed += Refresh;
         if (look != null) look.MenuToggled += Refresh;
         Refresh();
     }
@@ -41,6 +43,7 @@ public class RoundHud : MonoBehaviour
         round.RoundStarted -= Refresh;
         round.RoundFinished -= Refresh;
         round.StatsChanged -= Refresh;
+        if (difficultyChangedEvent != null) difficultyChangedEvent.Unsubscribe(OnDifficultyChanged);
         if (dda != null) dda.Changed -= Refresh;
         if (look != null) look.MenuToggled -= Refresh;
     }
@@ -68,6 +71,11 @@ public class RoundHud : MonoBehaviour
             _lastPaused = paused;
             Refresh();
         }
+    }
+
+    private void OnDifficultyChanged(DifficultyChange change)
+    {
+        Refresh();
     }
 
     private void Refresh()

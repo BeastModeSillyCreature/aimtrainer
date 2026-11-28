@@ -54,6 +54,11 @@ public class SessionRecord
     public int heatRows;
     public List<HeatCellRecord> heatCells = new List<HeatCellRecord>();
     public List<WindowRecord> windows = new List<WindowRecord>();
+
+    public override string ToString()
+    {
+        return $"Round: mode {mode}, accuracy {accuracy:F0}%, shots {shots}, {durationSeconds:F0} s";
+    }
 }
 
 // Профиль игрока целиком
